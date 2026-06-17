@@ -44,12 +44,12 @@
 
 ```bash
 # 全局安装后，直接一个命令启动！
-npm install -g webpanel
+npm install -g @lensi/webpanel
 webpanel
 ```
 
 > 安装时会**自动下载** ttyd 和 chmlfrp 二进制文件到项目目录，无需手动下载。
-> 如果提示权限错误，在 macOS/Linux 上加 `sudo`：`sudo npm install -g webpanel`
+> 如果提示权限错误，在 macOS/Linux 上加 `sudo`：`sudo npm install -g @lensi/webpanel`
 
 ---
 

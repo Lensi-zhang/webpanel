@@ -51,13 +51,18 @@ webpanel
 > 安装时会**自动下载** ttyd 和 chmlfrp 二进制文件到项目目录，无需手动下载。
 > 如果提示权限错误，在 macOS/Linux 上加 `sudo`：`sudo npm install -g @lensi/webpanel`
 
+> **Windows PowerShell 用户注意**：如果运行 `webpanel` 命令时报错 "running scripts is disabled"，请使用以下方式之一：
+> 1. 使用命令提示符（CMD）而不是 PowerShell
+> 2. 以管理员身份运行 PowerShell 并执行：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
+> 3. 使用完整路径运行：`node "C:\Users\<你的用户名>\AppData\Roaming\npm\node_modules\@lensi\webpanel\bin\webpanel.js"`
+
 ---
 
 ### 方式二：本地项目安装
 
 ```bash
-# 1. 克隆 / 下载项目
-git clone <仓库地址> WebPanel
+# 1. 克隆项目
+git clone https://github.com/Lensi-zhang/webpanel.git WebPanel
 cd WebPanel
 
 # 2. 安装依赖（自动下载 ttyd + chmlfrp）

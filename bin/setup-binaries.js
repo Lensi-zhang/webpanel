@@ -200,7 +200,7 @@ async function downloadTtyd() {
   if (plat.os !== 'windows') makeExecutable(dest);
 }
 
-// ---------- 下载 chmlfrp（使用标准 frp 客户端 frpc） ----------
+// ---------- 下载 chmlfrp（优先使用官方 CDN，失败回退到 GitHub frp） ----------
 async function downloadChmlfrp() {
   const plat = getPlatform();
   if (!plat) { WARN('不支持的平台，跳过 chmlfrp'); return; }
@@ -213,23 +213,52 @@ async function downloadChmlfrp() {
     return;
   }
 
-  // chmlfrp 客户端就是标准 frp 的 frpc
-  // 从 GitHub 下载 frp 的最新 release 压缩包，提取 frpc 并重命名
-  const version = await getLatestVersion('fatedier/frp') || '0.60.0';
+  const tmpDir = path.join(os.tmpdir(), `webpanel-chmlfrp-${Date.now()}`);
+  fs.mkdirSync(tmpDir, { recursive: true });
 
   const osName = plat.os === 'windows' ? 'windows' : plat.os === 'macos' ? 'darwin' : 'linux';
   const archiveExt = plat.os === 'windows' ? 'zip' : 'tar.gz';
-  const filename = `frp_${version}_${osName}_${plat.arch}.${archiveExt}`;
-  const url = `https://github.com/fatedier/frp/releases/download/v${version}/${filename}`;
 
-  const tmpDir = path.join(os.tmpdir(), `webpanel-frpc-${Date.now()}`);
-  fs.mkdirSync(tmpDir, { recursive: true });
-  const archivePath = path.join(tmpDir, filename);
+  // ---------- 方案 1：尝试 chmlfrp 官方 CDN（速度更快） ----------
+  // CDN 下载链接格式: https://cf-v1.uapis.cn/download/ChmlFrp-{版本}_{构建信息}_{平台}_{架构}.{扩展名}
+  // 从 https://panel.chmlfrp.net/tunnel/download 获取的当前版本信息
+  const cdnVersion = '0.51.2';
+  const cdnBuild = '251023_2';
+  const cdnFilename = `ChmlFrp-${cdnVersion}_${cdnBuild}_${osName}_${plat.arch}.${archiveExt}`;
+  const cdnUrl = `https://cf-v1.uapis.cn/download/${cdnFilename}`;
+  const cdnArchivePath = path.join(tmpDir, cdnFilename);
+
+  LOG('📥 尝试 chmlfrp 官方 CDN 下载...');
+  LOG(`   CDN URL: ${cdnUrl}`);
 
   try {
-    await downloadFile(url, archivePath, `frp v${version}（chmlfrp 客户端）`);
+    await downloadFile(cdnUrl, cdnArchivePath, `ChmlFrp v${cdnVersion}（官方 CDN）`);
+    await extractArchive(cdnArchivePath, tmpDir);
 
-    await extractArchive(archivePath, tmpDir);
+    const frpcPath = findFrpcInDir(tmpDir);
+    if (frpcPath) {
+      LOG(`   找到 frpc: ${frpcPath}`);
+      fs.copyFileSync(frpcPath, chmlDest);
+      if (plat.os !== 'windows') makeExecutable(chmlDest);
+      LOG(`✅ chmlfrp 已安装（官方 CDN）: ${chmlDest}`);
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+      return;
+    }
+    LOG('   ⚠️ CDN 包中未找到 frpc，尝试 GitHub 回退...');
+  } catch (e) {
+    LOG(`   ⚠️ CDN 下载失败: ${e.message}，尝试 GitHub 回退...`);
+  }
+
+  // ---------- 方案 2：回退到 GitHub fatedier/frp ----------
+  LOG('📥 从 GitHub 下载标准 frp 客户端...');
+  const version = await getLatestVersion('fatedier/frp') || '0.60.0';
+  const frpFilename = `frp_${version}_${osName}_${plat.arch}.${archiveExt}`;
+  const frpUrl = `https://github.com/fatedier/frp/releases/download/v${version}/${frpFilename}`;
+  const frpArchivePath = path.join(tmpDir, frpFilename);
+
+  try {
+    await downloadFile(frpUrl, frpArchivePath, `frp v${version}`);
+    await extractArchive(frpArchivePath, tmpDir);
 
     const frpcPath = findFrpcInDir(tmpDir);
     if (!frpcPath) {
@@ -239,11 +268,23 @@ async function downloadChmlfrp() {
     LOG(`   找到 frpc: ${frpcPath}`);
     fs.copyFileSync(frpcPath, chmlDest);
     if (plat.os !== 'windows') makeExecutable(chmlDest);
-    LOG(`✅ chmlfrp 已安装: ${chmlDest}`);
-  } finally {
-    // 清理临时文件
+    LOG(`✅ chmlfrp 已安装（GitHub 回退）: ${chmlDest}`);
+  } catch (e) {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+    LOG('');
+    LOG('============================================================');
+    LOG('  ❌ 自动下载 chmlfrp 失败，请手动下载：');
+    LOG('     1. 访问 https://panel.chmlfrp.net/tunnel/download');
+    LOG(`     2. 下载 ${osName}_${plat.arch} 版本`);
+    LOG(`     3. 解压后，将里面的 frpc 重命名为 ${chmlName}`);
+    LOG(`     4. 放到项目根目录: ${ROOT}`);
+    LOG('     或直接从 GitHub 下载 frp:');
+    LOG(`     ${frpUrl}`);
+    LOG('============================================================');
+    LOG('');
+    throw new Error('chmlfrp 自动下载失败，请按上方说明手动安装');
   }
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
 }
 
 // ---------- 主流程 ----------

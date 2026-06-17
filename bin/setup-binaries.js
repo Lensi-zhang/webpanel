@@ -23,9 +23,13 @@ const ERR = (...args) => console.error(`[setup] ❌`, ...args);
 function getPlatform() {
   const p = process.platform;
   const arch = process.arch;
-  if (p === 'win32') return { os: 'windows', arch: arch === 'x64' ? 'amd64' : '386', ext: '.exe' };
+  if (p === 'win32') {
+    // Windows: x64 → amd64, arm64 → arm64
+    const winArch = arch === 'x64' ? 'amd64' : (arch === 'arm64' ? 'arm64' : '386');
+    return { os: 'windows', arch: winArch, ext: '.exe' };
+  }
   if (p === 'darwin') return { os: 'macos', arch: arch === 'arm64' ? 'arm64' : 'amd64', ext: '' };
-  if (p === 'linux') return { os: 'linux', arch: arch === 'arm64' ? 'arm64' : (arch === 'x64' ? 'amd64' : '386'), ext: '' };
+  if (p === 'linux') return { os: 'linux', arch: arch === 'arm64' ? 'arm64' : (arch === 'x64' ? 'amd64' : 'amd64'), ext: '' };
   return null;
 }
 
@@ -179,6 +183,7 @@ async function downloadTtyd() {
 
   if (plat.os === 'windows') {
     // Windows: ttyd.win32.exe 是 Windows 版本（32位，可用于64位系统）
+    // 注意: ttyd 官方 release 没有专门的 arm64 Windows 版本
     filename = 'ttyd.win32.exe';
     dest = path.join(ROOT, 'ttyd.exe');
   } else if (plat.os === 'macos') {

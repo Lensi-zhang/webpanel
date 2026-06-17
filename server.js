@@ -166,23 +166,21 @@ function startTunnel() {
   switch (TUNNEL_TOOL) {
     case 'chmlfrp':
       cmd = path.join(__dirname, process.platform === 'win32' ? 'chmlfrp.exe' : 'chmlfrp');
-      const frpcIni = path.join(__dirname, 'frpc.ini');
-      const chmlUser = process.env.CHMLFRP_USER;
-      const chmlPass = process.env.CHMLFRP_PASS;
-      if (chmlUser && chmlPass) {
-        // 方式一：从 .env 读取 user + password（与 panel 生成的命令格式一致）
-        // 启动命令示例: chmlfrp.exe -u sEok9Qix0AdQyMd1hdt9dnKn -p 305822
-        log(`使用 .env 中的账号启动 chmlfrp → chmlfrp -u ${chmlUser} -p *****`);
-        args = ['-u', chmlUser, '-p', chmlPass];
-      } else if (fs.existsSync(frpcIni)) {
-        // 方式二：有 frpc.ini 配置文件（chmlfrp 也兼容 frpc.ini 格式）
+      // chmlfrp 使用标准 frp 客户端 (frpc)，支持 frpc.ini 和 frpc.toml 配置
+      const chmlConfig = path.join(__dirname, 'frpc.ini');
+      const chmlToml = path.join(__dirname, 'frpc.toml');
+      if (fs.existsSync(chmlConfig)) {
         log('检测到 frpc.ini，使用配置文件启动 chmlfrp');
-        args = ['-c', frpcIni];
+        args = ['-c', chmlConfig];
+      } else if (fs.existsSync(chmlToml)) {
+        log('检测到 frpc.toml，使用配置文件启动 chmlfrp');
+        args = ['-c', chmlToml];
       } else {
-        // 方式三：都找不到，提示用户配置
-        log('❌ 未配置 chmlfrp 账号！请在 .env 中设置 CHMLFRP_USER 和 CHMLFRP_PASS');
-        log('   从 panel.chmlfrp.net/tunnel/config 复制 user 和 password 填入 .env');
-        log('   示例启动命令: chmlfrp.exe -u <USER> -p <PASSWORD>');
+        log('❌ 未找到 chmlfrp 配置文件！请按以下步骤配置：');
+        log('   1. 登录 https://panel.chmlfrp.net/ 创建隧道');
+        log('   2. 从隧道配置页面下载/复制 frpc.ini 内容');
+        log('   3. 将 frpc.ini 保存到项目根目录（与 server.js 同目录）');
+        log('   4. 重启 WebPanel 即可自动启动内网穿透');
         return;
       }
       break;

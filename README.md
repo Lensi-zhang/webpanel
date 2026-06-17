@@ -171,34 +171,30 @@ NGROK_AUTHTOKEN=
 
 #### chmlfrp（推荐）
 - **官网**: https://www.chmlfrp.cn
-- **管理面板**: https://panel.chmlfrp.net/tunnel/config
-- **使用**: 放在项目根目录，在 `.env` 中设 `TUNNEL_TOOL=chmlfrp`
+- **管理面板**: https://panel.chmlfrp.net/
+- **客户端**: `npm install` 时自动下载（标准 frp 客户端 frpc，重命名为 chmlfrp）
 - **优点**: 国内访问速度快，操作简单，免费版足够使用
-- **配置步骤**:
-  1. 访问 https://panel.chmlfrp.net/tunnel/config 注册并登录
-  2. 左侧「节点列表」选择一个节点，记录 `serverAddr`（服务器地址）和 `serverPort`（端口，通常为 7000）
-  3. 左侧「我的隧道」创建新隧道，协议选 TCP，本地端口填 `9999`，创建后记录 `remotePort`（远程端口）
-  4. 在 `.env` 中填入从 panel 复制的 `user` 和 `password`（格式为 `CHMLFRP_USER=xxx` 和 `CHMLFRP_PASS=xxx`）
-  5. 运行 `npm start`，Node.js 自动拼接命令并启动
-- **启动命令格式**（chmlfrp 与 frp 兼容）:
-  ```
-  chmlfrp.exe -u <USER> -p <PASSWORD>
-  ```
-- **frpc.ini 配置文件格式**（可选，chmlfrp 也支持此格式）:
-  ```ini
-  [common]
-  server_addr = 你的节点地址
-  server_port = 7000
-  user = 你的user
-  token = 你的token
+- **使用方式**:
+  1. 在 `.env` 中设置 `TUNNEL_TOOL=chmlfrp`
+  2. 从 chmlfrp 管理面板创建隧道，下载 `frpc.ini` 或 `frpc.toml`
+  3. 将配置文件放在项目根目录
+  4. 运行 `npm start`，自动检测并使用配置文件启动
 
-  [webpanel]
-  type = tcp
-  local_ip = 127.0.0.1
-  local_port = 9999
-  remote_port = 分配给你的远程端口
-  ```
-  将 `frpc.ini` 放在项目根目录，Node.js 会自动检测并使用
+**frpc.ini 示例**（从 chmlfrp 面板复制）:
+```ini
+[common]
+server_addr = 你的节点地址
+server_port = 7000
+user = 你的user
+token = 你的token
+
+[webpanel]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 9999
+remote_port = 分配给你的远程端口
+```
+将 `frpc.ini` 放在项目根目录，Node.js 会自动检测并使用
 
 ---
 
@@ -244,28 +240,16 @@ NGROK_AUTHTOKEN=
    - **用户ID（user）**：一串字符，如 `abc123`
    - **密码（password）**：你的登录密码
 
-##### 第五步：配置到项目中
+##### 第五步：获取并配置 frpc.ini
 
-**方式一：通过 .env 配置（推荐）**
-
-编辑项目根目录的 `.env` 文件：
-
-```bash
-TUNNEL_TOOL=chmlfrp
-TUNNEL_ENABLE=true
-CHMLFRP_USER=你的user
-CHMLFRP_PASS=你的password
-```
-
-**方式二：通过 frpc.ini 配置文件**
-
-编辑项目根目录的 `frpc.ini` 文件（将以下内容替换为你的真实信息）：
+1. 在 chmlfrp 管理面板「**我的隧道**」页面，点击「**下载配置文件**」或「**查看配置**」
+2. 复制生成的 frpc.ini 内容，通常包含以下信息：
 
 ```ini
 [common]
-server_addr = 你的服务器地址
+server_addr = 你的节点服务器地址
 server_port = 7000
-user = 你的user
+user = 你的用户ID
 token = 你的token
 
 [webpanel]
@@ -274,6 +258,10 @@ local_ip = 127.0.0.1
 local_port = 9999
 remote_port = 分配给你的远程端口
 ```
+
+3. 将以上内容保存为项目根目录的 `frpc.ini` 文件（与 `server.js` 同目录）
+
+**注意**: `.env` 文件中只需设置 `TUNNEL_TOOL=chmlfrp`，无需额外配置 user/password
 
 ##### 第六步：启动！
 

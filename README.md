@@ -134,7 +134,6 @@ WebPanel/
 ├── index.html                    # 管理面板界面
 ├── ttyd / ttyd.exe              # 自动下载的 Web 终端
 ├── cpolar / cpolar.exe        # 自动下载的内网穿透（可切换为 chmlfrp / frp / ngrok）
-├── frpc.ini                      # ⚠️ 内网穿透通道配置（必填，需填入你的 user 和 password）
 ├── README.md                     # 项目文档
 └── node_modules/                 # npm 依赖
 ```
@@ -396,10 +395,9 @@ A:
 1. 访问 https://panel.chmlfrp.net/tunnel/config 注册并登录
 2. 左侧「节点列表」选择一个节点，记录 `server_addr` 和 `server_port`
 3. 左侧「我的隧道」创建新隧道：协议选 TCP，本地端口填 9999，记录分配到的 `remote_port`
-4. 在 `.env` 中设置 `CHMLFRP_USER`（你的 user_id）和 `CHMLFRP_PASS`（你的密码）
-5. 保存后运行 `npm start`，Node.js 自动拼接 `chmlfrp.exe -u <USER> -p <PASS>` 并启动
-6. 也可以下载 panel 生成的 frpc.ini 放到项目根目录，Node.js 会自动检测并使用
-项目根目录已附带完整模板文件 `frpc.ini`，按注释填入即可。
+4. 在「我的隧道」页面下载生成的 `frpc.ini` 配置文件
+5. 将 `frpc.ini` 放到项目根目录
+6. 在 `.env` 中设置 `TUNNEL_TOOL=chmlfrp`，运行 `npm start` 即可自动启动
 
 **Q: 如何停止所有服务？**
 A: 在运行 `npm start` 的终端按 `Ctrl+C`，Node.js 会自动停止 ttyd 和内网穿透。

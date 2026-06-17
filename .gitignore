@@ -27,10 +27,10 @@ Thumbs.db
 # ttyd 和内网穿透二进制（用户自行下载）
 ttyd
 ttyd.exe
-chmlfrp
-chmlfrp.exe
 cpolar
 cpolar.exe
+chmlfrp
+chmlfrp.exe
 frpc
 frpc.exe
 ngrok

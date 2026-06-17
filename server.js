@@ -4,7 +4,7 @@
 //   1. 提供管理面板静态文件（index.html 等）
 //   2. 反向代理 /terminal/ 到本地 ttyd（含 WebSocket）
 //   3. 自动启动 ttyd 子进程
-//   4. 可选启动内网穿透工具（chmlfrp / cpolar / frp / ngrok）
+//   4. 可选启动内网穿透工具（cpolar / chmlfrp / frp / ngrok）
 // 启动：npm install && npm start
 // ============================================================
 
@@ -21,7 +21,7 @@ const PORT = parseInt(process.env.PORT) || 9999;
 const TTYD_PORT = parseInt(process.env.TTYD_PORT) || 7681;
 const TTYD_EXEC = process.env.TTYD_EXEC || path.join(__dirname, (process.platform === 'win32' ? 'ttyd.exe' : 'ttyd'));
 const TTYD_SHELL = process.env.TTYD_SHELL || (process.platform === 'win32' ? 'cmd.exe' : 'bash');
-const TUNNEL_TOOL = process.env.TUNNEL_TOOL || 'chmlfrp'; // chmlfrp | cpolar | frp | ngrok
+const TUNNEL_TOOL = process.env.TUNNEL_TOOL || 'cpolar'; // cpolar | chmlfrp | frp | ngrok
 const TUNNEL_ENABLE = process.env.TUNNEL_ENABLE !== 'false'; // 默认启用内网穿透
 
 // ---------- 子进程引用 ----------
@@ -186,7 +186,23 @@ function startTunnel() {
       break;
     case 'cpolar':
       cmd = path.join(__dirname, process.platform === 'win32' ? 'cpolar.exe' : 'cpolar');
-      args = ['http', String(PORT)];
+      // cpolar 支持两种启动方式：
+      // 1. 有 cpolar.yml 配置文件时使用配置文件
+      // 2. 无配置时使用 authtoken（从环境变量 CPOLAR_AUTH_TOKEN 读取）
+      const cpolarConfig = path.join(__dirname, 'cpolar.yml');
+      if (fs.existsSync(cpolarConfig)) {
+        log('检测到 cpolar.yml，使用配置文件启动');
+        args = ['-c', cpolarConfig];
+      } else {
+        const authToken = process.env.CPOLAR_AUTH_TOKEN;
+        if (authToken) {
+          log('使用 CPOLAR_AUTH_TOKEN 启动 cpolar');
+          args = ['authtoken', authToken, 'http', String(PORT)];
+        } else {
+          log('未找到 cpolar.yml 和 CPOLAR_AUTH_TOKEN，使用默认配置启动');
+          args = ['http', String(PORT)];
+        }
+      }
       break;
     case 'frp':
       cmd = path.join(__dirname, process.platform === 'win32' ? 'frpc.exe' : 'frpc');

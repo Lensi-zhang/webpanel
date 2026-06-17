@@ -171,15 +171,25 @@ async function downloadTtyd() {
 
   const version = await getLatestVersion('tsl0922/ttyd') || '1.7.7';
 
-  const archName = plat.arch === 'amd64' ? 'x86_64' : (plat.arch === 'arm64' ? 'aarch64' : plat.arch);
-  const filename = plat.os === 'windows'
-    ? `ttyd_${version}_windows_${archName}.exe`
-    : plat.os === 'macos'
-      ? `ttyd_${version}_macos_${archName}`
-      : `ttyd_${version}_linux_${archName}`;
+  // ttyd 发布文件名格式因版本而异
+  // 新版本 (1.10.0+): ttyd.x86_64, ttyd.aarch64 等
+  // 旧版本 (1.7.x): ttyd.win32.exe, ttyd.x86_64 等
+  let filename;
+  let dest = path.join(ROOT, plat.os === 'windows' ? 'ttyd.exe' : 'ttyd');
 
-  const url = `https://github.com/tsl0922/ttyd/releases/download/v${version}/${filename}`;
-  const dest = path.join(ROOT, plat.os === 'windows' ? 'ttyd.exe' : 'ttyd');
+  if (plat.os === 'windows') {
+    // Windows: ttyd.win32.exe 是 Windows 版本（32位，可用于64位系统）
+    filename = 'ttyd.win32.exe';
+    dest = path.join(ROOT, 'ttyd.exe');
+  } else if (plat.os === 'macos') {
+    // macOS: ttyd.x86_64 或 ttyd.aarch64
+    filename = plat.arch === 'arm64' ? 'ttyd.aarch64' : 'ttyd.x86_64';
+  } else {
+    // Linux: ttyd.x86_64 或 ttyd.aarch64
+    filename = plat.arch === 'amd64' ? 'ttyd.x86_64' : (plat.arch === 'arm64' ? 'ttyd.aarch64' : 'ttyd.x86_64');
+  }
+
+  const url = `https://github.com/tsl0922/ttyd/releases/download/${version}/${filename}`;
 
   await downloadFile(url, dest, `ttyd v${version}`);
   if (plat.os !== 'windows') makeExecutable(dest);

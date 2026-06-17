@@ -1,0 +1,47 @@
+# 依赖
+node_modules/
+
+# 环境变量（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 构建产物
+dist/
+build/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ttyd 和内网穿透二进制（用户自行下载）
+ttyd
+ttyd.exe
+chmlfrp
+chmlfrp.exe
+cpolar
+cpolar.exe
+frpc
+frpc.exe
+ngrok
+ngrok.exe
+
+# 其他二进制
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 配置文件（用户个性化配置）
+frpc.ini
+frpc.toml

@@ -1,0 +1,31 @@
+{
+  "name": "webpanel",
+  "version": "1.0.0",
+  "description": "通用 Web 终端面板 — 基于 ttyd + Node.js，任何终端工具都可在浏览器中使用",
+  "main": "server.js",
+  "bin": {
+    "webpanel": "./bin/webpanel.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "postinstall": "node bin/setup-binaries.js"
+  },
+  "keywords": [
+    "webpanel",
+    "ttyd",
+    "terminal",
+    "web-terminal",
+    "web-ssh",
+    "mimocode"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "http-proxy": "^1.18.1"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

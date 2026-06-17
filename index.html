@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebPanel | 通用 Web 终端面板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        * {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .file-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .folder-icon { color: #fbbf24; }
+        .file-icon { color: #60a5fa; }
+        .link-icon { color: #a78bfa; }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+
+        .terminal-iframe {
+            border: none;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <nav class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex-shrink-0">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-server text-blue-400 text-xl"></i>
+                <h1 class="text-xl font-bold">WebPanel 终端面板</h1>
+                <span class="text-xs text-green-400 bg-green-900/50 px-2 py-1 rounded">
+                    <i class="fas fa-check-circle mr-1"></i>真实 Web 终端 (ttyd)
+                </span>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <span class="text-green-400"><i class="fas fa-circle text-xs mr-1"></i>在线</span>
+                <span class="text-gray-400" id="datetime"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左侧：项目文件结构 -->
+        <div class="w-1/4 border-r border-gray-700 flex flex-col">
+            <div class="p-4 border-b border-gray-700 bg-gray-800">
+                <h2 class="font-semibold flex items-center">
+                    <i class="fas fa-folder-tree mr-2 text-yellow-400"></i>
+                    项目文件
+                </h2>
+            </div>
+            <div class="flex-1 overflow-y-auto scrollbar-thin p-2" id="fileTree">
+            </div>
+        </div>
+
+        <!-- 右侧：真实 Web 终端 -->
+        <div class="flex-1 flex flex-col">
+            <div class="p-4 border-b border-gray-700 bg-gray-800 flex justify-between items-center">
+                <h2 class="font-semibold flex items-center">
+                    <i class="fas fa-terminal mr-2 text-green-400"></i>
+                    真实系统终端 — 可运行任意命令
+                </h2>
+                <div class="text-xs">
+                    <span class="text-green-400 mr-4">
+                        <i class="fas fa-check-circle mr-1"></i>ttyd: 已连接 (端口 7681)
+                    </span>
+                    <span class="text-blue-400">
+                        <i class="fas fa-info-circle mr-1"></i>输入 mimo / python3 / node / vim ... 任意命令
+                    </span>
+                </div>
+            </div>
+            <div class="flex-1 bg-black">
+                <!-- 嵌入 ttyd 真实终端（由 Node.js 反向代理到 /terminal/） -->
+                <iframe src="/terminal/" class="terminal-iframe" id="terminalFrame"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="bg-gray-800 border-t border-gray-700 px-6 py-2 text-xs flex justify-between flex-shrink-0">
+        <div class="flex space-x-6">
+            <span><i class="fab fa-node-js mr-1 text-green-400"></i>Node.js 服务</span>
+            <span><i class="fas fa-terminal mr-1 text-blue-400"></i>ttyd 终端</span>
+            <span><i class="fas fa-globe mr-1 text-yellow-400"></i>任意终端工具</span>
+        </div>
+        <div class="flex space-x-6">
+            <span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>终端就绪</span>
+            <span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>服务运行中</span>
+            <span class="text-blue-400"><i class="fas fa-check-circle mr-1"></i>按 Ctrl+C 停止</span>
+        </div>
+    </div>
+
+    <script>
+        // 文件结构数据（动态展示当前项目）
+        const fileStructure = [
+            { name: '📦 项目根目录', type: 'folder', children: [
+                { name: 'package.json', type: 'file', size: '依赖配置' },
+                { name: 'server.js', type: 'file', size: '主程序' },
+                { name: '.env', type: 'file', size: '统一配置' },
+                { name: 'index.html', type: 'file', size: '管理面板' },
+                { name: 'ttyd', type: 'file', size: 'Web 终端' },
+                { name: 'chmlfrp / cpolar / frp / ngrok', type: 'link', target: '' },
+                { name: 'README.md', type: 'file', size: '项目文档' },
+            ]},
+            { name: '💡 使用提示', type: 'folder', children: [
+                { name: '启动: npm install && npm start', type: 'file', size: '' },
+                { name: '访问: http://localhost:9999', type: 'file', size: '' },
+                { name: '输入 mimo 启动小米 AI 助手', type: 'file', size: '' },
+                { name: '输入 python3 进入 Python', type: 'file', size: '' },
+                { name: '输入 node 进入 Node.js', type: 'file', size: '' },
+            ]},
+        ];
+
+        function renderFileTree(items, container, level = 0) {
+            items.forEach(item => {
+                const indent = level * 20;
+                const div = document.createElement('div');
+                div.className = 'file-item px-2 py-1 rounded cursor-pointer flex items-center text-sm';
+                div.style.paddingLeft = `${indent + 8}px`;
+
+                let icon = '', iconClass = '';
+                if (item.type === 'folder') { icon = 'fa-folder'; iconClass = 'folder-icon'; }
+                else if (item.type === 'link') { icon = 'fa-link'; iconClass = 'link-icon'; }
+                else { icon = 'fa-file'; iconClass = 'file-icon'; }
+
+                div.innerHTML = `<i class="fas ${icon} ${iconClass} mr-2 w-4"></i><span class="flex-1">${item.name}</span><span class="text-gray-500 text-xs">${item.size || ''}</span>`;
+                container.appendChild(div);
+                if (item.type === 'folder' && item.children) renderFileTree(item.children, container, level + 1);
+            });
+        }
+        renderFileTree(fileStructure, document.getElementById('fileTree'));
+
+        function updateTime() {
+            document.getElementById('datetime').textContent = new Date().toLocaleString('zh-CN');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

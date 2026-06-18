@@ -174,30 +174,35 @@ async function downloadTtyd() {
   if (!plat) { WARN('不支持的平台，跳过 ttyd'); return; }
 
   const version = await getLatestVersion('tsl0922/ttyd') || '1.7.7';
-
-  // ttyd 发布文件名格式因版本而异
-  // 新版本 (1.10.0+): ttyd.x86_64, ttyd.aarch64 等
-  // 旧版本 (1.7.x): ttyd.win32.exe, ttyd.x86_64 等
   let filename;
   let dest = path.join(ROOT, plat.os === 'windows' ? 'ttyd.exe' : 'ttyd');
 
   if (plat.os === 'windows') {
-    // Windows: ttyd.win32.exe 是 Windows 版本（32位，可用于64位系统）
-    // 注意: ttyd 官方 release 没有专门的 arm64 Windows 版本
     filename = 'ttyd.win32.exe';
     dest = path.join(ROOT, 'ttyd.exe');
   } else if (plat.os === 'macos') {
-    // macOS: ttyd.x86_64 或 ttyd.aarch64
     filename = plat.arch === 'arm64' ? 'ttyd.aarch64' : 'ttyd.x86_64';
   } else {
-    // Linux: ttyd.x86_64 或 ttyd.aarch64
     filename = plat.arch === 'amd64' ? 'ttyd.x86_64' : (plat.arch === 'arm64' ? 'ttyd.aarch64' : 'ttyd.x86_64');
   }
 
   const url = `https://github.com/tsl0922/ttyd/releases/download/${version}/${filename}`;
 
-  await downloadFile(url, dest, `ttyd v${version}`);
-  if (plat.os !== 'windows') makeExecutable(dest);
+  try {
+    await downloadFile(url, dest, `ttyd v${version}`);
+    if (plat.os !== 'windows') makeExecutable(dest);
+  } catch (e) {
+    LOG('');
+    LOG('============================================================');
+    LOG('  ❌ 自动下载 ttyd 失败，请手动下载：');
+    LOG('     1. 访问 https://github.com/tsl0922/ttyd/releases');
+    LOG(`     2. 下载对应平台的 ttyd 二进制文件`);
+    LOG(`     3. 放到项目根目录: ${ROOT}`);
+    LOG(`     下载直链: ${url}`);
+    LOG('============================================================');
+    LOG('');
+    throw new Error('ttyd 自动下载失败，请按上方说明手动安装');
+  }
 }
 
 // ---------- 下载 cpolar ----------

@@ -187,13 +187,13 @@ function startTunnel() {
     case 'cpolar':
       cmd = path.join(__dirname, process.platform === 'win32' ? 'cpolar.exe' : 'cpolar');
       // cpolar 启动方式：
-      // 1. 有 cpolar.yml 配置文件时：cpolar -config <path>（按配置文件定义的隧道启动）
+      // 1. 有 cpolar.yml 配置文件时：cpolar http <port> -config=<path>
       // 2. 无配置文件但有 CPOLAR_AUTH_TOKEN 时：cpolar http <port> -authtoken=<token>
       // 3. 无配置也无 token：cpolar http <port>（未认证状态）
       const cpolarConfig = path.join(__dirname, 'cpolar.yml');
       if (fs.existsSync(cpolarConfig)) {
         log('检测到 cpolar.yml，使用配置文件启动');
-        args = ['-config=' + cpolarConfig];
+        args = ['http', String(PORT), '-config=' + cpolarConfig];
       } else {
         const authToken = process.env.CPOLAR_AUTH_TOKEN;
         if (authToken) {

@@ -185,7 +185,7 @@ NGROK_AUTHTOKEN=
 #### chmlfrp
 - **官网**: https://www.chmlfrp.cn
 - **管理面板**: https://panel.chmlfrp.net/
-- **客户端**: `npm install` 时自动下载（标准 frp 客户端 frpc，重命名为 chmlfrp）
+- **客户端**: 需从 https://github.com/fatedier/frp/releases 下载 frpc 二进制并重命名为 `chmlfrp`（或 `chmlfrp.exe`）放到项目根目录，npm install 不会自动下载
 - **优点**: 国内访问速度快，操作简单，免费版足够使用
 - **使用方式**:
   1. 在 `.env` 中设置 `TUNNEL_TOOL=chmlfrp`

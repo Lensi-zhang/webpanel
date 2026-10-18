@@ -205,6 +205,39 @@ async function downloadTtyd() {
   }
 }
 
+// ---------- 获取 cpolar 最新版本号 ----------
+// cpolar 官网下载页: https://www.cpolar.com/download
+// 尝试从页面解析版本号，失败则使用默认版本
+function getCpolarLatestVersion(defaultVersion) {
+  return new Promise((resolve) => {
+    LOG(`正在查询 cpolar 最新版本...`);
+    https.get('https://www.cpolar.com/download', {
+      headers: { 'User-Agent': 'WebPanel/1.0' }
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          // 匹配 cpolar-stable-x.y.z- 形式的版本号
+          const match = data.match(/cpolar-stable-(\d+\.\d+\.\d+)/);
+          if (match && match[1]) {
+            LOG(`   最新版本: v${match[1]}`);
+            resolve(match[1]);
+          } else {
+            WARN(`   无法从页面解析版本号，使用默认版本 v${defaultVersion}`);
+            resolve(defaultVersion);
+          }
+        } catch (_) {
+          resolve(defaultVersion);
+        }
+      });
+    }).on('error', () => {
+      WARN(`   查询 cpolar 版本失败，使用默认版本 v${defaultVersion}`);
+      resolve(defaultVersion);
+    });
+  });
+}
+
 // ---------- 下载 cpolar ----------
 async function downloadCpolar() {
   const plat = getPlatform();
@@ -223,7 +256,9 @@ async function downloadCpolar() {
 
   // cpolar 下载链接格式（来源: https://www.cpolar.com/download）
   // cpolar-stable-{os}-{arch}.zip（所有平台均为 zip）
-  const cpolarVersion = '3.3.12';
+  // 优先使用环境变量指定的版本，否则尝试获取最新版本，最后使用默认版本
+  const DEFAULT_CPOLAR_VERSION = '3.3.12';
+  const cpolarVersion = process.env.CPOLAR_VERSION || await getCpolarLatestVersion(DEFAULT_CPOLAR_VERSION);
   const osName = plat.os === 'windows' ? 'windows' : plat.os === 'macos' ? 'darwin' : 'linux';
   const cpolarFilename = `cpolar-stable-${osName}-${plat.arch}.zip`;
   const cpolarUrl = `https://www.cpolar.com/static/downloads/releases/${cpolarVersion}/${cpolarFilename}`;

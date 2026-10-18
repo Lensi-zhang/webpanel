@@ -80,6 +80,11 @@ npm start
 ====================================
     WebPanel 正在启动...
 ====================================
+⚠️  未设置 ADMIN_PASSWORD，已自动生成随机密码：
+    用户名: admin
+    密码:   xxxxxxxxxxxxxxxx
+    建议在 .env 中设置 ADMIN_USERNAME 和 ADMIN_PASSWORD
+
 ✅ 管理面板: http://localhost:9999
 ✅ Web 终端: http://localhost:9999/terminal/
 ✅ 状态检查: http://localhost:9999/api/status
@@ -92,6 +97,8 @@ npm start
 | **仅终端** | `http://localhost:9999/terminal/` |
 | **公网访问** | cpolar 等输出的地址 |
 | **状态检查** | `http://localhost:9999/api/status` |
+
+> 🔒 **首次访问需登录**：使用启动日志中显示的账号密码，或 `.env` 中配置的 `ADMIN_USERNAME` / `ADMIN_PASSWORD`。
 
 ---
 
@@ -149,6 +156,12 @@ TTYD_PORT=7681
 TTYD_EXEC=./ttyd
 TTYD_SHELL=bash                  # Linux/macOS 填 bash，Windows 填 cmd.exe
 
+# 管理面板登录认证（⚠️ 强烈建议设置，否则将自动生成随机密码并打印到控制台）
+ADMIN_USERNAME=admin             # 登录用户名
+ADMIN_PASSWORD=your_strong_password  # 登录密码（请使用强密码）
+SESSION_SECRET=                   # 会话签名密钥（不设置则每次启动随机生成，导致旧会话失效）
+SESSION_TTL=43200000              # 会话有效期（毫秒），默认 12 小时
+
 # 内网穿透工具（4 选 1，设 TUNNEL_ENABLE=false 可禁用）
 TUNNEL_TOOL=cpolar              # cpolar | chmlfrp | frp | ngrok
 TUNNEL_ENABLE=true
@@ -157,6 +170,54 @@ CHMLFRP_TOKEN=
 FRPC_CONF=./frpc.toml
 NGROK_AUTHTOKEN=
 ```
+
+> ⚠️ **安全提醒**：务必设置 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`，否则每次启动会生成随机密码。`SESSION_SECRET` 建议固定设置，否则服务重启后所有登录会话会失效。
+
+## 🔒 安全特性
+
+WebPanel 内置多层安全防护，保护终端不被未授权访问：
+
+### 1. 会话认证
+- 管理面板和终端均需登录后才能访问
+- 会话 Cookie 使用 HMAC-SHA256 签名，`HttpOnly` + `SameSite=Strict`
+- 密码采用恒定时间比较（`crypto.timingSafeEqual`），防止计时攻击
+- 未设置密码时自动生成随机密码并打印到控制台
+
+### 2. ttyd 双重认证
+- ttyd 本身启用 Basic Auth（内部账号密码随机生成）
+- Node.js 代理自动注入 `Authorization` 头，用户只需登录一次
+- 即使绕过 Node.js 直接访问 ttyd 端口也需要认证
+
+### 3. 安全响应头
+| 响应头 | 作用 |
+|--------|------|
+| `X-Content-Type-Options: nosniff` | 防止 MIME 类型嗅探 |
+| `X-Frame-Options: SAMEORIGIN` | 防止点击劫持 |
+| `Content-Security-Policy` | 限制资源加载来源 |
+| `Referrer-Policy: no-referrer` | 不发送 Referrer 信息 |
+| `X-XSS-Protection` | 启用浏览器 XSS 过滤 |
+
+### 4. 速率限制
+- 普通请求：每 IP 每分钟 120 次
+- 登录请求：每 IP 每分钟 5 次（防暴力破解）
+
+### 5. Origin 校验
+- WebSocket 和终端代理请求校验 `Origin` 头，仅允许同源访问
+- 防止跨站 WebSocket 劫持和 CSRF
+
+### 6. iframe 沙箱
+- 终端 iframe 设置 `sandbox` 属性，禁止弹窗、顶层导航等危险操作
+
+### 7. 信息泄露防护
+- 错误信息不暴露内部路径和系统细节
+- 静态文件服务增加目录穿越防护
+- 404 不再 fallback 到 index.html，避免路径探测
+
+> ⚠️ **公网部署建议**：即使有上述防护，将系统终端暴露到公网仍存在风险。建议：
+> 1. 使用强密码并定期更换
+> 2. 尽量通过 HTTPS 访问（可在 cpolar/frp 配置 TLS）
+> 3. 限制内网穿透工具的访问 IP 白名单
+> 4. 不在生产环境使用默认配置
 
 ## 📝 各组件详细说明
 

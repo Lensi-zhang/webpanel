@@ -54,6 +54,9 @@
             <div class="flex items-center space-x-4 text-sm">
                 <span class="text-green-400"><i class="fas fa-circle text-xs mr-1"></i>在线</span>
                 <span class="text-gray-400" id="datetime"></span>
+                <a href="/logout" class="text-red-400 hover:text-red-300 transition" title="退出登录">
+                    <i class="fas fa-sign-out-alt mr-1"></i>退出
+                </a>
             </div>
         </div>
     </nav>
@@ -89,7 +92,10 @@
             </div>
             <div class="flex-1 bg-black">
                 <!-- 嵌入 ttyd 真实终端（由 Node.js 反向代理到 /terminal/） -->
-                <iframe src="/terminal/" class="terminal-iframe" id="terminalFrame"></iframe>
+                <!-- sandbox 限制：仅允许脚本执行和同源访问，禁止弹窗、顶层导航等 -->
+                <iframe src="/terminal/" class="terminal-iframe" id="terminalFrame"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+                        referrerpolicy="no-referrer"></iframe>
             </div>
         </div>
     </div>

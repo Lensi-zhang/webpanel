@@ -26,6 +26,14 @@ const TTYD_SHELL = process.env.TTYD_SHELL || (process.platform === 'win32' ? 'cm
 const TUNNEL_TOOL = process.env.TUNNEL_TOOL || 'cpolar'; // cpolar | chmlfrp | frp | ngrok
 const TUNNEL_ENABLE = process.env.TUNNEL_ENABLE !== 'false'; // 默认启用内网穿透
 
+// ---- 文件管理器配置 ----
+// 文件浏览根目录（默认当前工作目录），所有路径访问都限制在此目录内
+const FILE_ROOT = path.resolve(process.env.FILE_ROOT || process.cwd());
+// 单文件预览上限（超过则只允许下载）
+const FILE_PREVIEW_MAX = 256 * 1024;
+// 单目录最多返回的条目数
+const FILE_LIST_MAX = 5000;
+
 // ---- 认证配置 ----
 // 管理面板登录账号（必须在 .env 中设置，否则自动生成随机密码并打印到控制台）
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -105,6 +113,39 @@ function getClientIp(req) {
   const fwd = req.headers['x-forwarded-for'];
   if (fwd) return fwd.split(',')[0].trim();
   return req.socket.remoteAddress || 'unknown';
+}
+
+// ---------- 文件管理器路径安全 ----------
+// 判断 target 是否位于 base 目录内（避免 "/root-evil" 被 "/root" 前缀误判）
+function isInside(base, target) {
+  const rel = path.relative(base, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+// 将前端传入的相对路径解析为绝对路径，越界返回 null
+function resolveSafePath(relPath) {
+  const cleaned = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const target = path.resolve(FILE_ROOT, cleaned);
+  return isInside(FILE_ROOT, target) ? target : null;
+}
+
+// 解析符号链接后仍需位于根目录内，防止通过软链接逃逸
+async function isRealpathInsideRoot(target) {
+  try {
+    const realRoot = await fs.promises.realpath(FILE_ROOT);
+    const realTarget = await fs.promises.realpath(target);
+    return isInside(realRoot, realTarget);
+  } catch (_) {
+    return false;
+  }
+}
+
+function sendJson(res, status, obj) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  res.end(JSON.stringify(obj));
 }
 
 // ---------- 速率限制 ----------
@@ -383,6 +424,111 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ---- /api/files → 目录列表（左侧文件树）----
+  if (reqUrl === '/api/files' && req.method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const target = resolveSafePath(url.searchParams.get('path'));
+    if (!target || !(await isRealpathInsideRoot(target))) {
+      sendJson(res, 403, { error: '路径不合法' });
+      return;
+    }
+    let dirents;
+    try {
+      dirents = await fs.promises.readdir(target, { withFileTypes: true });
+    } catch (err) {
+      const notFound = err.code === 'ENOENT' || err.code === 'EACCES' || err.code === 'EPERM';
+      sendJson(res, notFound ? 404 : 400, { error: err.code === 'ENOTDIR' ? '不是目录' : '无法读取目录' });
+      return;
+    }
+    const limited = dirents.slice(0, FILE_LIST_MAX);
+    const entries = await Promise.all(limited.map(async (d) => {
+      const full = path.join(target, d.name);
+      let type = d.isDirectory() ? 'dir' : 'file';
+      let size = 0;
+      let mtime = 0;
+      try {
+        const st = await fs.promises.stat(full);
+        type = st.isDirectory() ? 'dir' : 'file';
+        size = st.size;
+        mtime = st.mtimeMs;
+      } catch (_) {}
+      return { name: d.name, type, link: d.isSymbolicLink(), size, mtime };
+    }));
+    entries.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name, 'zh-CN', { numeric: true });
+    });
+    const normRel = path.relative(FILE_ROOT, target).split(path.sep).join('/');
+    const parent = normRel === ''
+      ? null
+      : normRel.includes('/') ? normRel.slice(0, normRel.lastIndexOf('/')) : '';
+    sendJson(res, 200, {
+      root: FILE_ROOT,
+      path: normRel,
+      parent,
+      entries,
+      truncated: dirents.length > limited.length
+    });
+    return;
+  }
+
+  // ---- /api/file → 文本文件预览 ----
+  if (reqUrl === '/api/file' && req.method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const target = resolveSafePath(url.searchParams.get('path'));
+    if (!target || !(await isRealpathInsideRoot(target))) {
+      sendJson(res, 403, { error: '路径不合法' });
+      return;
+    }
+    try {
+      const st = await fs.promises.stat(target);
+      if (!st.isFile()) {
+        sendJson(res, 400, { error: '不是文件' });
+        return;
+      }
+      if (st.size > FILE_PREVIEW_MAX) {
+        sendJson(res, 200, { tooLarge: true, size: st.size });
+        return;
+      }
+      const buf = await fs.promises.readFile(target);
+      // 含 NUL 字节视为二进制
+      if (buf.subarray(0, 8000).includes(0)) {
+        sendJson(res, 200, { binary: true, size: st.size });
+        return;
+      }
+      sendJson(res, 200, { size: st.size, content: buf.toString('utf8') });
+    } catch (_) {
+      sendJson(res, 404, { error: '文件不存在或无权限' });
+    }
+    return;
+  }
+
+  // ---- /api/download → 文件下载 ----
+  if (reqUrl === '/api/download' && req.method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const target = resolveSafePath(url.searchParams.get('path'));
+    if (!target || !(await isRealpathInsideRoot(target))) {
+      sendJson(res, 403, { error: '路径不合法' });
+      return;
+    }
+    fs.stat(target, (err, st) => {
+      if (err || !st.isFile()) {
+        sendJson(res, 404, { error: '文件不存在' });
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': st.size,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(target))}`,
+        'Cache-Control': 'no-store'
+      });
+      const stream = fs.createReadStream(target);
+      stream.on('error', () => res.destroy());
+      stream.pipe(res);
+    });
+    return;
+  }
+
   // ---- 其他 → 静态文件服务（管理面板）----
   let filePath;
   if (reqUrl === '/' || reqUrl === '') {
@@ -391,9 +537,9 @@ const server = http.createServer(async (req, res) => {
     filePath = path.join(__dirname, reqUrl);
   }
 
-  // 防目录穿越
+  // 防目录穿越（用 relative 判断，避免前缀相同目录绕过）
   const normalized = path.normalize(filePath);
-  if (!normalized.startsWith(__dirname)) {
+  if (!isInside(__dirname, normalized)) {
     res.writeHead(403);
     res.end('Forbidden');
     return;

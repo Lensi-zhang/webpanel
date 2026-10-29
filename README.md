@@ -8,6 +8,7 @@
 
 - ✅ **Node.js 一体化服务** — 不再需要 Nginx，一个 `npm start` 启动所有组件
 - ✅ **真实 Web 终端** — 基于 ttyd，浏览器访问系统 shell
+- ✅ **文件管理器** — 左侧实时浏览 `FILE_ROOT` 目录、展开子目录、预览文本文件、下载文件
 - ✅ **支持 4 种内网穿透** — cpolar（推荐） / chmlfrp / frp / ngrok
 - ✅ **统一配置文件** — 所有设置在 `.env` 中，修改后重启即可
 
@@ -161,6 +162,9 @@ ADMIN_USERNAME=admin             # 登录用户名
 ADMIN_PASSWORD=your_strong_password  # 登录密码（请使用强密码）
 SESSION_SECRET=                   # 会话签名密钥（不设置则每次启动随机生成，导致旧会话失效）
 SESSION_TTL=43200000              # 会话有效期（毫秒），默认 12 小时
+
+# 左侧文件管理器
+FILE_ROOT=                       # 文件浏览根目录（默认当前工作目录），所有访问都限制在此目录内
 
 # 内网穿透工具（4 选 1，设 TUNNEL_ENABLE=false 可禁用）
 TUNNEL_TOOL=cpolar              # cpolar | chmlfrp | frp | ngrok

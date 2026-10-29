@@ -64,12 +64,16 @@
     <div class="flex flex-1 overflow-hidden">
         <!-- 左侧：项目文件结构 -->
         <div class="w-1/4 border-r border-gray-700 flex flex-col">
-            <div class="p-4 border-b border-gray-700 bg-gray-800">
+            <div class="p-4 border-b border-gray-700 bg-gray-800 flex items-center justify-between">
                 <h2 class="font-semibold flex items-center">
                     <i class="fas fa-folder-tree mr-2 text-yellow-400"></i>
                     项目文件
                 </h2>
+                <button id="refreshTree" class="text-gray-400 hover:text-blue-400 transition" title="刷新文件树">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
             </div>
+            <div class="px-4 py-1 text-[11px] text-gray-500 border-b border-gray-700 truncate" id="rootPath"></div>
             <div class="flex-1 overflow-y-auto scrollbar-thin p-2" id="fileTree">
             </div>
         </div>
@@ -114,45 +118,180 @@
         </div>
     </div>
 
+    <!-- 文件预览弹窗 -->
+    <div id="previewModal" class="hidden fixed inset-0 z-50 bg-black/70 p-6">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg w-full h-full flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-700 flex-shrink-0">
+                <div class="flex items-center min-w-0">
+                    <i class="fas fa-file text-blue-400 mr-2"></i>
+                    <span id="previewName" class="truncate text-sm font-semibold"></span>
+                    <span id="previewMeta" class="text-xs text-gray-500 ml-3 flex-shrink-0"></span>
+                </div>
+                <div class="flex items-center space-x-4 flex-shrink-0">
+                    <a id="previewDownload" href="#" class="text-sm text-blue-400 hover:text-blue-300">
+                        <i class="fas fa-download mr-1"></i>下载
+                    </a>
+                    <button id="previewClose" class="text-gray-400 hover:text-red-400" title="关闭">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <pre id="previewBody" class="flex-1 overflow-auto scrollbar-thin p-4 text-xs text-gray-200 bg-gray-900 whitespace-pre-wrap break-all"></pre>
+        </div>
+    </div>
+
     <script>
-        // 文件结构数据（动态展示当前项目）
-        const fileStructure = [
-            { name: '📦 项目根目录', type: 'folder', children: [
-                { name: 'package.json', type: 'file', size: '依赖配置' },
-                { name: 'server.js', type: 'file', size: '主程序' },
-                { name: '.env', type: 'file', size: '统一配置' },
-                { name: 'index.html', type: 'file', size: '管理面板' },
-                { name: 'ttyd', type: 'file', size: 'Web 终端' },
-                { name: 'chmlfrp / cpolar / frp / ngrok', type: 'link', target: '' },
-                { name: 'README.md', type: 'file', size: '项目文档' },
-            ]},
-            { name: '💡 使用提示', type: 'folder', children: [
-                { name: '启动: npm install && npm start', type: 'file', size: '' },
-                { name: '访问: http://localhost:9999', type: 'file', size: '' },
-                { name: '输入 mimo 启动小米 AI 助手', type: 'file', size: '' },
-                { name: '输入 python3 进入 Python', type: 'file', size: '' },
-                { name: '输入 node 进入 Node.js', type: 'file', size: '' },
-            ]},
-        ];
+        // ========== 左侧文件树（对接 /api/files） ==========
+        const treeEl = document.getElementById('fileTree');
+        const rootPathEl = document.getElementById('rootPath');
+        const modalEl = document.getElementById('previewModal');
+        const previewNameEl = document.getElementById('previewName');
+        const previewMetaEl = document.getElementById('previewMeta');
+        const previewBodyEl = document.getElementById('previewBody');
+        const previewDownloadEl = document.getElementById('previewDownload');
 
-        function renderFileTree(items, container, level = 0) {
-            items.forEach(item => {
-                const indent = level * 20;
-                const div = document.createElement('div');
-                div.className = 'file-item px-2 py-1 rounded cursor-pointer flex items-center text-sm';
-                div.style.paddingLeft = `${indent + 8}px`;
-
-                let icon = '', iconClass = '';
-                if (item.type === 'folder') { icon = 'fa-folder'; iconClass = 'folder-icon'; }
-                else if (item.type === 'link') { icon = 'fa-link'; iconClass = 'link-icon'; }
-                else { icon = 'fa-file'; iconClass = 'file-icon'; }
-
-                div.innerHTML = `<i class="fas ${icon} ${iconClass} mr-2 w-4"></i><span class="flex-1">${item.name}</span><span class="text-gray-500 text-xs">${item.size || ''}</span>`;
-                container.appendChild(div);
-                if (item.type === 'folder' && item.children) renderFileTree(item.children, container, level + 1);
-            });
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
         }
-        renderFileTree(fileStructure, document.getElementById('fileTree'));
+
+        function formatSize(bytes) {
+            if (!bytes) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let n = bytes, i = 0;
+            while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+            return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
+        }
+
+        function joinRel(parent, name) {
+            return parent ? parent + '/' + name : name;
+        }
+
+        async function fetchFiles(rel) {
+            const res = await fetch('/api/files?path=' + encodeURIComponent(rel), { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            return data;
+        }
+
+        function renderEntries(container, entries, rel, level) {
+            if (!entries.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500 py-1';
+                empty.style.paddingLeft = (level * 16 + 8) + 'px';
+                empty.textContent = '（空目录）';
+                container.appendChild(empty);
+                return;
+            }
+            entries.forEach(entry => container.appendChild(createRow(entry, rel, level)));
+        }
+
+        function createRow(entry, parentRel, level) {
+            const rel = joinRel(parentRel, entry.name);
+            const isDir = entry.type === 'dir';
+            const wrapper = document.createElement('div');
+
+            const row = document.createElement('div');
+            row.className = 'file-item px-2 py-1 rounded cursor-pointer flex items-center text-sm select-none';
+            row.style.paddingLeft = (level * 16 + 8) + 'px';
+            row.title = entry.name;
+            row.innerHTML = `
+                <i class="fas ${isDir ? 'fa-chevron-right text-xs text-gray-500 transition-transform' : 'fa-file text-xs text-blue-400'} w-3 mr-1"></i>
+                <i class="fas ${isDir ? 'fa-folder folder-icon' : (entry.link ? 'fa-link link-icon' : 'fa-file file-icon')} mr-2 w-4"></i>
+                <span class="flex-1 truncate">${escapeHtml(entry.name)}</span>
+                <span class="text-gray-500 text-xs">${isDir ? '' : formatSize(entry.size)}</span>`;
+            wrapper.appendChild(row);
+
+            if (isDir) {
+                const chevron = row.querySelector('.fa-chevron-right');
+                const children = document.createElement('div');
+                children.className = 'hidden';
+                wrapper.appendChild(children);
+
+                row.addEventListener('click', async () => {
+                    if (!children.classList.contains('hidden')) {
+                        children.classList.add('hidden');
+                        chevron.classList.replace('fa-chevron-down', 'fa-chevron-right');
+                        return;
+                    }
+                    if (!children.dataset.loaded) {
+                        try {
+                            const data = await fetchFiles(rel);
+                            children.innerHTML = '';
+                            renderEntries(children, data.entries, rel, level + 1);
+                            children.dataset.loaded = '1';
+                        } catch (err) {
+                            children.innerHTML = '';
+                            const fail = document.createElement('div');
+                            fail.className = 'text-xs text-red-400 py-1';
+                            fail.style.paddingLeft = ((level + 1) * 16 + 8) + 'px';
+                            fail.textContent = '加载失败：' + err.message;
+                            children.appendChild(fail);
+                            return;
+                        }
+                    }
+                    children.classList.remove('hidden');
+                    chevron.classList.replace('fa-chevron-right', 'fa-chevron-down');
+                });
+            } else {
+                row.addEventListener('click', () => openPreview(rel, entry));
+            }
+            return wrapper;
+        }
+
+        async function loadRoot() {
+            treeEl.innerHTML = '';
+            try {
+                const data = await fetchFiles('');
+                rootPathEl.textContent = data.root;
+                rootPathEl.title = data.root;
+                renderEntries(treeEl, data.entries, '', 0);
+                if (data.truncated) {
+                    const tip = document.createElement('div');
+                    tip.className = 'text-xs text-yellow-400 p-2';
+                    tip.textContent = '目录条目过多，仅显示前 5000 项';
+                    treeEl.appendChild(tip);
+                }
+            } catch (err) {
+                treeEl.innerHTML = `<div class="text-xs text-red-400 p-2">无法读取目录：${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function closePreview() {
+            modalEl.classList.add('hidden');
+            previewBodyEl.textContent = '';
+        }
+
+        async function openPreview(rel, entry) {
+            previewNameEl.textContent = entry.name;
+            previewMetaEl.textContent = formatSize(entry.size);
+            previewBodyEl.textContent = '加载中...';
+            previewDownloadEl.href = '/api/download?path=' + encodeURIComponent(rel);
+            modalEl.classList.remove('hidden');
+            try {
+                const res = await fetch('/api/file?path=' + encodeURIComponent(rel), { credentials: 'same-origin' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                if (data.binary) {
+                    previewBodyEl.textContent = '二进制文件，无法以文本方式预览。请点击右上角「下载」。';
+                } else if (data.tooLarge) {
+                    previewBodyEl.textContent = `文件过大（${formatSize(data.size)}），请点击右上角「下载」查看。`;
+                } else {
+                    previewBodyEl.textContent = data.content || '（空文件）';
+                }
+            } catch (err) {
+                previewBodyEl.textContent = '预览失败：' + err.message;
+            }
+        }
+
+        document.getElementById('refreshTree').addEventListener('click', loadRoot);
+        document.getElementById('previewClose').addEventListener('click', closePreview);
+        modalEl.addEventListener('click', (e) => { if (e.target === modalEl) closePreview(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePreview(); });
+
+        // 首次加载文件树
+        loadRoot();
 
         function updateTime() {
             document.getElementById('datetime').textContent = new Date().toLocaleString('zh-CN');

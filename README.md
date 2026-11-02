@@ -45,12 +45,12 @@
 
 ```bash
 # 全局安装后，直接一个命令启动！
-npm install -g @lensi/webpanel
+npm install @lensi-zhang/webpanel@1.3.0
 webpanel
 ```
 
 > 安装时会**自动下载** ttyd 和 cpolar 二进制文件到项目目录，无需手动下载。
-> 如果提示权限错误，在 macOS/Linux 上加 `sudo`：`sudo npm install -g @lensi/webpanel`
+> 如果提示权限错误，在 macOS/Linux 上加 `sudo`：`sudo npm install @lensi-zhang/webpanel@1.3.0`
 
 > **Windows PowerShell 用户注意**：如果运行 `webpanel` 命令时报错 "running scripts is disabled"，请使用以下方式之一：
 > 1. 使用命令提示符（CMD）而不是 PowerShell

@@ -1,5 +1,5 @@
 {
-  "name": "@lensi/webpanel",
+  "name": "@lensi-zhang/webpanel",
   "version": "1.3.0",
   "description": "通用 Web 终端面板 — 基于 ttyd + Node.js，任何终端工具都可在浏览器中使用",
   "main": "server.js",

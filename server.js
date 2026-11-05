@@ -584,7 +584,8 @@ server.on('upgrade', (req, socket, head) => {
 function startTtyd() {
   log(`启动 ttyd 终端服务 → 端口 ${TTYD_PORT}，shell: ${TTYD_SHELL}`);
   // ttyd 启用 basic auth（内部认证，由 Node.js 代理自动注入 Authorization 头）
-  const args = ['-p', String(TTYD_PORT), '-c', `${TTYD_USERNAME}:${TTYD_PASSWORD}`, TTYD_SHELL];
+  // ttyd 1.7+ 默认只读，必须加 -W 才允许客户端写入终端
+  const args = ['-p', String(TTYD_PORT), '-c', `${TTYD_USERNAME}:${TTYD_PASSWORD}`, '-W', TTYD_SHELL];
   try {
     ttydProc = spawn(TTYD_EXEC, args, {
       stdio: ['ignore', 'pipe', 'pipe']
